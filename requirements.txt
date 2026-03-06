@@ -1,0 +1,9 @@
+numpy
+pandas
+tqdm
+pyyaml
+matplotlib
+sqlalchemy
+psycopg2-binary
+jupyter
+pytest
