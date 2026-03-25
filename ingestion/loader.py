@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any, Dict, Generator, List
 
@@ -11,6 +12,7 @@ from waymo_open_dataset import dataset_pb2
 # A label represents one annotated object in the frame
 def label_to_dict(label: dataset_pb2.Label) -> Dict[str, Any]:
     box = label.box
+    meta = label.metadata
     return {
         "id": label.id,
         "type": int(label.type),
@@ -21,15 +23,25 @@ def label_to_dict(label: dataset_pb2.Label) -> Dict[str, Any]:
         "width": box.width,
         "height": box.height,
         "heading": box.heading,
+        "num_lidar_points": label.num_lidar_points_in_box,
+        "detection_difficulty": int(label.detection_difficulty_level),
+        "tracking_difficulty": int(label.tracking_difficulty_level),
+        "speed_x": meta.speed_x,
+        "speed_y": meta.speed_y,
+        "range": math.sqrt(box.center_x ** 2 + box.center_y ** 2),
     }
 
 # Convert one Waymo Frame protobuf object into a Python dict.
 # A frame is one timestamped snapshot of the scene
 def frame_to_dict(frame: dataset_pb2.Frame, frame_index: int) -> Dict[str, Any]:
+    stats = frame.context.stats
     return {
         "context_name": frame.context.name,
         "timestamp_micros": frame.timestamp_micros,
         "frame_index": frame_index,
+        "location": stats.location,
+        "weather": stats.weather,
+        "time_of_day": stats.time_of_day,
         "laser_labels": [label_to_dict(label) for label in frame.laser_labels],
     }
 
@@ -61,9 +73,12 @@ if __name__ == "__main__":
     frames = load_first_n_frames(sample_path, n=2)
     for frame in frames:
         print(
-            f"context={frame['context_name']} " 
+            f"context={frame['context_name']} "
             f"timestamp={frame['timestamp_micros']} "
-            f"num_labels={len(frame['laser_labels'])}"
+            f"num_labels={len(frame['laser_labels'])} "
+            f"location={frame['location']} "
+            f"weather={frame['weather']} "
+            f"time_of_day={frame['time_of_day']}"
         )
 
         print("\nFirst 3 labels:")
