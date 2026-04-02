@@ -119,3 +119,39 @@ class Prediction(Base):
     )
 
     frame = relationship("Frame", back_populates="predictions")
+
+
+class EvalResult(Base):
+    """One row per match decision (TP, FP, or FN) from an evaluation run.
+
+    Stores everything needed for Milestone 3's SQL slicing:
+    distance-based analysis, per-class breakdowns, and SDE statistics.
+    """
+
+    __tablename__ = "eval_results"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_name = Column(String, nullable=False, index=True)
+    frame_id = Column(Integer, ForeignKey("frames.id"), nullable=False, index=True)
+
+    object_type = Column(Integer, nullable=False)
+    match_type = Column(String(2), nullable=False)
+
+    prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=True)
+    ground_truth_id = Column(Integer, ForeignKey("ground_truths.id"), nullable=True)
+
+    confidence = Column(Float, nullable=True)
+    iou = Column(Float, nullable=True)
+    heading_accuracy = Column(Float, nullable=True)
+    sde = Column(Float, nullable=True)
+    signed_sde = Column(Float, nullable=True)
+    gt_range = Column(Float, nullable=True)
+
+    __table_args__ = (
+        Index("ix_eval_run_type", "run_name", "object_type"),
+        Index("ix_eval_match", "match_type"),
+    )
+
+    frame = relationship("Frame")
+    prediction = relationship("Prediction")
+    ground_truth = relationship("GroundTruth")

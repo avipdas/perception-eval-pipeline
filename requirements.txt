@@ -7,3 +7,5 @@ sqlalchemy
 psycopg2-binary
 jupyter
 pytest
+shapely
+tensorflow

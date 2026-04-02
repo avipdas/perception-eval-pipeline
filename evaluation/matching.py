@@ -64,12 +64,8 @@ def match_frame(ground_truths: list[dict], predictions: list[dict], object_type:
                 best_gt = gt
 
         if best_gt is not None and best_iou >= iou_threshold:
-            # True Positive: prediction matched a ground truth
             matched_gt_ids.add(best_gt["id"])
 
-            # Heading accuracy: how well the predicted heading matches GT.
-            # Defined as min(|cos(pred_heading - gt_heading)|, 1.0).
-            # Perfect heading match → 1.0, perpendicular → 0.0.
             heading_diff = pred["heading"] - best_gt["heading"]
             heading_accuracy = abs(math.cos(heading_diff))
 
@@ -78,19 +74,21 @@ def match_frame(ground_truths: list[dict], predictions: list[dict], object_type:
                 "confidence": pred["confidence"],
                 "iou": best_iou,
                 "gt_id": best_gt["id"],
+                "gt_db_id": best_gt.get("db_id"),
+                "pred_db_id": pred.get("db_id"),
                 "heading_accuracy": heading_accuracy,
             })
         else:
-            # False Positive: prediction didn't match anything
             results.append({
                 "match_type": "FP",
                 "confidence": pred["confidence"],
                 "iou": None,
                 "gt_id": None,
+                "gt_db_id": None,
+                "pred_db_id": pred.get("db_id"),
                 "heading_accuracy": None,
             })
 
-    # False Negatives: ground truths that were never matched (misses)
     for gt in ground_truths:
         if gt["id"] not in matched_gt_ids:
             results.append({
@@ -98,6 +96,8 @@ def match_frame(ground_truths: list[dict], predictions: list[dict], object_type:
                 "confidence": None,
                 "iou": None,
                 "gt_id": gt["id"],
+                "gt_db_id": gt.get("db_id"),
+                "pred_db_id": None,
                 "heading_accuracy": None,
             })
 
