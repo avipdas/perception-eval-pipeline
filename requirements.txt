@@ -9,3 +9,5 @@ jupyter
 pytest
 shapely
 tensorflow
+fastapi
+uvicorn[standard]
