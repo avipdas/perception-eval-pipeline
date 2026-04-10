@@ -16,6 +16,16 @@ export default function ControlPanel({
   setFilterTypes,
   filterMatch,
   setFilterMatch,
+  showDistanceRings,
+  setShowDistanceRings,
+  showTrails,
+  setShowTrails,
+  showMotionVectors,
+  setShowMotionVectors,
+  showCorridor,
+  setShowCorridor,
+  showMinimap,
+  setShowMinimap,
 }) {
   const toggleType = (val) => {
     if (filterTypes === null) {
@@ -49,29 +59,40 @@ export default function ControlPanel({
   return (
     <div className="panel">
       <h3>Layers</h3>
-      <label className="toggle">
-        <input
-          type="checkbox"
-          checked={showPointCloud}
-          onChange={() => setShowPointCloud(!showPointCloud)}
-        />
+      <label className="toggle" title="Keyboard: 1">
+        <input type="checkbox" checked={showPointCloud} onChange={() => setShowPointCloud(!showPointCloud)} />
         Point Cloud
       </label>
-      <label className="toggle">
-        <input
-          type="checkbox"
-          checked={showGt}
-          onChange={() => setShowGt(!showGt)}
-        />
+      <label className="toggle" title="Keyboard: 2">
+        <input type="checkbox" checked={showGt} onChange={() => setShowGt(!showGt)} />
         Ground Truth
       </label>
-      <label className="toggle">
-        <input
-          type="checkbox"
-          checked={showPred}
-          onChange={() => setShowPred(!showPred)}
-        />
+      <label className="toggle" title="Keyboard: 3">
+        <input type="checkbox" checked={showPred} onChange={() => setShowPred(!showPred)} />
         Predictions
+      </label>
+
+      <h3>3D Overlays</h3>
+      <p className="panel-hint">Declutter the scene; metrics unchanged.</p>
+      <label className="toggle">
+        <input type="checkbox" checked={showDistanceRings} onChange={() => setShowDistanceRings(!showDistanceRings)} />
+        Distance rings
+      </label>
+      <label className="toggle">
+        <input type="checkbox" checked={showTrails} onChange={() => setShowTrails(!showTrails)} />
+        GT motion trails
+      </label>
+      <label className="toggle">
+        <input type="checkbox" checked={showMotionVectors} onChange={() => setShowMotionVectors(!showMotionVectors)} />
+        TP offset vectors
+      </label>
+      <label className="toggle">
+        <input type="checkbox" checked={showCorridor} onChange={() => setShowCorridor(!showCorridor)} />
+        Safety corridor
+      </label>
+      <label className="toggle">
+        <input type="checkbox" checked={showMinimap} onChange={() => setShowMinimap(!showMinimap)} />
+        Bird&apos;s-eye minimap
       </label>
 
       <h3>Object Type</h3>
@@ -102,10 +123,10 @@ export default function ControlPanel({
 
       <div className="legend">
         <h3>Legend</h3>
-        <div><span className="dot" style={{background:"#22c55e"}} /> GT — matched (TP)</div>
-        <div><span className="dot" style={{background:"#eab308"}} /> GT — missed (FN)</div>
-        <div><span className="dot" style={{background:"#3b82f6"}} /> Pred — matched (TP)</div>
-        <div><span className="dot" style={{background:"#ef4444"}} /> Pred — hallucination (FP)</div>
+        <div><span className="dot dot-tp" /> GT — matched (TP)</div>
+        <div><span className="dot dot-fn" /> GT — missed (FN)</div>
+        <div><span className="dot dot-pred-tp" /> Pred — matched (TP)</div>
+        <div><span className="dot dot-fp" /> Pred — hallucination (FP)</div>
       </div>
     </div>
   );

@@ -16,6 +16,10 @@ export default function PointCloud({ data, visible = true }) {
     const pos = new Float32Array(n * 3);
     const col = new Float32Array(n * 3);
 
+    const cLow = new THREE.Color("#4a148c");
+    const cMid = new THREE.Color("#00bcd4");
+    const cHigh = new THREE.Color("#e8eaf6");
+
     for (let i = 0; i < n; i++) {
       const x = buf[i * 4 + 0];
       const y = buf[i * 4 + 1];
@@ -25,10 +29,13 @@ export default function PointCloud({ data, visible = true }) {
       pos[i * 3 + 1] = y;
       pos[i * 3 + 2] = z;
 
-      // Color by height — blue (low) → cyan → green → yellow → red (high)
       const t = Math.max(0, Math.min(1, (z - HEIGHT_MIN) / (HEIGHT_MAX - HEIGHT_MIN)));
       const c = new THREE.Color();
-      c.setHSL(0.67 - t * 0.67, 1.0, 0.5);
+      if (t < 0.5) {
+        c.lerpColors(cLow, cMid, t * 2);
+      } else {
+        c.lerpColors(cMid, cHigh, (t - 0.5) * 2);
+      }
       col[i * 3 + 0] = c.r;
       col[i * 3 + 1] = c.g;
       col[i * 3 + 2] = c.b;
@@ -56,11 +63,11 @@ export default function PointCloud({ data, visible = true }) {
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.08}
+        size={0.07}
         vertexColors
         sizeAttenuation
         transparent
-        opacity={0.85}
+        opacity={0.9}
       />
     </points>
   );

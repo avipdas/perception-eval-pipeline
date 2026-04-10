@@ -31,6 +31,9 @@ from dashboard.point_cloud import (
 from storage.database import DatabaseManager
 from storage.schema import EvalResult, Frame, GroundTruth, Prediction, Segment
 
+_DATA_DIR = _PROJECT_ROOT / "data"
+_RAW_WAYMO_DIR = _DATA_DIR / "raw" / "waymo"
+
 app = FastAPI(title="Perception Eval Dashboard")
 
 app.add_middleware(
@@ -42,7 +45,8 @@ app.add_middleware(
 
 
 def _db() -> DatabaseManager:
-    return DatabaseManager()
+    db_path = _PROJECT_ROOT / "data" / "eval.db"
+    return DatabaseManager(f"sqlite:///{db_path}")
 
 
 # ── GET /api/frames ──────────────────────────────────────────────────
@@ -87,10 +91,10 @@ def get_point_cloud(frame_id: int):
         context_name = seg.context_name
         frame_index = frame.frame_index
 
-    tfrecord = find_tfrecord_for_context(context_name)
+    tfrecord = find_tfrecord_for_context(context_name, data_dir=_RAW_WAYMO_DIR)
     if tfrecord is None:
         raise HTTPException(
-            404, f"TFRecord for context {context_name} not found in data/raw/waymo/",
+            404, f"TFRecord for context {context_name} not found in {_RAW_WAYMO_DIR}",
         )
 
     proto_frame = load_frame_from_tfrecord(tfrecord, frame_index)
@@ -211,6 +215,7 @@ def get_failures(
         "worst_misses": text("""
             SELECT
                 er.frame_id,
+                gt.object_id AS highlight_object_id,
                 CASE er.object_type
                     WHEN 1 THEN 'VEHICLE'
                     WHEN 2 THEN 'PEDESTRIAN'
@@ -228,6 +233,7 @@ def get_failures(
         "dangerous_errors": text("""
             SELECT
                 er.frame_id,
+                ('pred_' || er.prediction_id) AS highlight_object_id,
                 CASE er.object_type
                     WHEN 1 THEN 'VEHICLE'
                     WHEN 2 THEN 'PEDESTRIAN'
@@ -248,6 +254,7 @@ def get_failures(
         "hallucinations": text("""
             SELECT
                 er.frame_id,
+                ('pred_' || er.prediction_id) AS highlight_object_id,
                 CASE er.object_type
                     WHEN 1 THEN 'VEHICLE'
                     WHEN 2 THEN 'PEDESTRIAN'
@@ -271,6 +278,26 @@ def get_failures(
         rows = [dict(zip(columns, row)) for row in result.fetchall()]
 
     return rows
+
+
+# ── GET /api/frame_stats ──────────────────────────────────────────────
+
+@app.get("/api/frame_stats")
+def get_frame_stats(run_name: str = "waymo_v1"):
+    """Return per-frame TP/FP/FN counts for the timeline scrubber."""
+    db = _db()
+    with db.engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT
+                frame_id,
+                SUM(CASE WHEN match_type='TP' THEN 1 ELSE 0 END) AS tp,
+                SUM(CASE WHEN match_type='FP' THEN 1 ELSE 0 END) AS fp,
+                SUM(CASE WHEN match_type='FN' THEN 1 ELSE 0 END) AS fn
+            FROM eval_results
+            WHERE run_name = :r
+            GROUP BY frame_id
+        """), {"r": run_name}).fetchall()
+    return {str(r[0]): {"tp": r[1], "fp": r[2], "fn": r[3]} for r in rows}
 
 
 # ── GET /api/runs ────────────────────────────────────────────────────
@@ -374,7 +401,7 @@ def get_camera(frame_id: int):
             raise HTTPException(404, "Frame not found")
         seg = s.query(Segment).filter(Segment.id == frame.segment_id).first()
 
-    tfrecord = find_tfrecord_for_context(seg.context_name)
+    tfrecord = find_tfrecord_for_context(seg.context_name, data_dir=_RAW_WAYMO_DIR)
     if tfrecord is None:
         raise HTTPException(404, "TFRecord not found")
 

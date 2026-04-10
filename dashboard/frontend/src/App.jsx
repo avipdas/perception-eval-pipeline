@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import SceneViewer from "./components/SceneViewer";
 import FrameSelector from "./components/FrameSelector";
 import ControlPanel from "./components/ControlPanel";
@@ -6,7 +6,11 @@ import FailureBrowser from "./components/FailureBrowser";
 import MetricsPanel from "./components/MetricsPanel";
 import PRCurve from "./components/PRCurve";
 import CameraView from "./components/CameraView";
-import { fetchFrames, fetchPointCloud, fetchBoxes, fetchRuns } from "./api";
+import SdeOverlay from "./components/SdeOverlay";
+import Minimap from "./components/Minimap";
+import ObjectDetail from "./components/ObjectDetail";
+import RunMetadataStrip from "./components/RunMetadataStrip";
+import { fetchFrames, fetchPointCloud, fetchBoxes, fetchRuns, fetchFrameStats } from "./api";
 import "./App.css";
 
 const TRAIL_SIZE = 5;
@@ -28,6 +32,10 @@ function setUrlParams(frameId, runName) {
   window.history.replaceState(null, "", url);
 }
 
+function formatSessionTime(d) {
+  return d.toISOString().replace("T", " ").slice(0, 19) + "Z";
+}
+
 export default function App() {
   const urlInit = getUrlParams();
 
@@ -47,15 +55,33 @@ export default function App() {
   const [runName, setRunName] = useState(urlInit.runName);
   const [runs, setRuns] = useState([]);
   const [trailBuffer, setTrailBuffer] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const [viewMode, setViewMode] = useState("both");
+  const [showCorridor, setShowCorridor] = useState(false);
+  const [selectedBox, setSelectedBox] = useState(null);
+  const [frameStats, setFrameStats] = useState({});
+
+  const [showDistanceRings, setShowDistanceRings] = useState(true);
+  const [showTrails, setShowTrails] = useState(true);
+  const [showMotionVectors, setShowMotionVectors] = useState(true);
+  const [showMinimap, setShowMinimap] = useState(true);
+
+  const [sessionStartedAt] = useState(() => formatSessionTime(new Date()));
 
   const canvasRef = useRef(null);
+  /** Monotonic id so out-of-order point cloud / box responses never overwrite the current frame. */
+  const fetchSeqRef = useRef(0);
 
-  // Load available runs
+  const currentFrame = useMemo(
+    () => frames.find((f) => f.id === frameId) ?? null,
+    [frames, frameId]
+  );
+
   useEffect(() => {
     fetchRuns().then(setRuns).catch(() => setRuns(["waymo_v1"]));
   }, []);
 
-  // Load frame list
   useEffect(() => {
     fetchFrames().then((data) => {
       setFrames(data);
@@ -66,53 +92,88 @@ export default function App() {
     });
   }, []);
 
-  // Load frame data
+  useEffect(() => {
+    fetchFrameStats(runName)
+      .then((stats) => setFrameStats((prev) => ({ ...prev, ...stats })))
+      .catch(() => {});
+  }, [runName]);
+
   useEffect(() => {
     if (frameId == null) return;
+    const seq = ++fetchSeqRef.current;
     let cancelled = false;
     setLoading(true);
-    setPointCloudData(null);
-    setBoxes(null);
+    setSelectedBox(null);
 
-    Promise.all([fetchPointCloud(frameId), fetchBoxes(frameId, runName)])
-      .then(([pc, bx]) => {
-        if (cancelled) return;
-        setPointCloudData(pc);
-        setBoxes(bx);
-        setTrailBuffer((prev) => {
-          const next = [...prev, bx].slice(-TRAIL_SIZE);
-          return next;
-        });
+    let pending = 2;
+    const finishOne = () => {
+      pending -= 1;
+      if (pending <= 0 && !cancelled && seq === fetchSeqRef.current) {
+        setLoading(false);
+      }
+    };
+
+    const applyIfCurrent = () => !cancelled && seq === fetchSeqRef.current;
+
+    fetchPointCloud(frameId)
+      .then((pc) => {
+        if (!applyIfCurrent()) return;
+        setPointCloudData({ ...pc, frameId, loadSeq: seq });
       })
-      .catch((err) => console.error("Failed to load frame:", err))
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .catch((err) => {
+        console.error("Point cloud:", err);
+        if (applyIfCurrent()) {
+          setPointCloudData({
+            buffer: new Float32Array(0),
+            count: 0,
+            frameId,
+            loadSeq: seq,
+          });
+        }
+      })
+      .finally(finishOne);
 
-    return () => { cancelled = true; };
+    fetchBoxes(frameId, runName)
+      .then((bx) => {
+        if (!applyIfCurrent()) return;
+        setBoxes(bx);
+        setTrailBuffer((prev) => [...prev, bx].slice(-TRAIL_SIZE));
+        if (bx) {
+          const tp = bx.filter((b) => b.match_type === "TP").length;
+          const fp = bx.filter((b) => b.match_type === "FP").length;
+          const fn = bx.filter((b) => b.match_type === "FN").length;
+          setFrameStats((prev) => ({ ...prev, [frameId]: { tp, fp, fn } }));
+        }
+      })
+      .catch((err) => console.error("Boxes:", err))
+      .finally(finishOne);
+
+    return () => {
+      cancelled = true;
+    };
   }, [frameId, runName]);
 
-  // URL state sync
   useEffect(() => {
     setUrlParams(frameId, runName);
   }, [frameId, runName]);
 
-  // Frame change handler -- supports callback form for playback timer
-  const handleSelectFrame = useCallback(
-    (idOrFn) => {
-      if (typeof idOrFn === "function") {
-        setFrameId((prev) => {
-          const next = idOrFn(prev);
-          setHighlightId(null);
-          return next;
-        });
-      } else {
-        setFrameId(idOrFn);
+  const handleSelectFrame = useCallback((idOrFn, highlightObjectId) => {
+    if (typeof idOrFn === "function") {
+      setFrameId((prev) => {
+        const next = idOrFn(prev);
         setHighlightId(null);
-      }
-    },
-    []
-  );
+        return next;
+      });
+      return;
+    }
+    setFrameId(idOrFn);
+    setHighlightId(highlightObjectId !== undefined ? highlightObjectId : null);
+  }, []);
 
-  // Keyboard shortcuts
+  const handleSelectBox = useCallback((box) => {
+    setSelectedBox((prev) => (prev?.object_id === box.object_id && prev?.source === box.source) ? null : box);
+  }, []);
+
   useEffect(() => {
     const handler = (e) => {
       if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
@@ -137,6 +198,10 @@ export default function App() {
         case "3":
           setShowPred((v) => !v);
           break;
+        case "Escape":
+          setSelectedBox(null);
+          setHighlightId(null);
+          break;
         default:
           break;
       }
@@ -145,7 +210,6 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [frames, frameId, handleSelectFrame]);
 
-  // Screenshot
   const handleScreenshot = useCallback(() => {
     const canvas = document.querySelector("canvas");
     if (!canvas) return;
@@ -165,43 +229,125 @@ export default function App() {
       }
     : null;
 
+  const pointCloudMountKey =
+    frameId != null
+      ? `pc-f${frameId}-s${pointCloudData?.loadSeq ?? "pending"}`
+      : "pc-none";
+
+  const sceneProps = {
+    pointCloudData,
+    pointCloudMountKey,
+    showPointCloud,
+    filterTypes,
+    filterMatch,
+    highlightId,
+    trailBuffer,
+    showCorridor,
+    showDistanceRings,
+    showTrails,
+    showMotionVectors,
+    onSelectBox: handleSelectBox,
+    selectedBoxId: selectedBox?.object_id ?? null,
+  };
+
+  const isSplit = viewMode === "split";
+
+  const sceneChrome = (
+    <>
+      <div className={`load-progress ${loading ? "load-progress-active" : ""}`} aria-hidden />
+      <RunMetadataStrip
+        runName={runName}
+        frame={currentFrame}
+        loading={loading}
+        sessionStartedAt={sessionStartedAt}
+      />
+    </>
+  );
+
   return (
     <div className="app">
-      <div className="scene-container">
-        {loading && (
-          <div className="loading-overlay">
-            <div className="spinner" />
-            <span>Loading point cloud...</span>
-          </div>
-        )}
-        <SceneViewer
-          ref={canvasRef}
-          pointCloudData={pointCloudData}
-          boxes={boxes}
-          showPointCloud={showPointCloud}
-          showGt={showGt}
-          showPred={showPred}
-          filterTypes={filterTypes}
-          filterMatch={filterMatch}
-          highlightId={highlightId}
-          trailBuffer={trailBuffer}
-        />
-        <CameraView frameId={frameId} />
-        {stats && (
-          <div className="stats-bar">
-            <span>Points: {pointCloudData?.count?.toLocaleString() ?? "—"}</span>
-            <span>GT: {stats.gt}</span>
-            <span className="tp">TP: {stats.tp}</span>
-            <span className="fp">FP: {stats.fp}</span>
-            <span className="fn">FN: {stats.fn}</span>
-            <button className="screenshot-btn" onClick={handleScreenshot} title="Save screenshot (PNG)">
-              📷 Screenshot
-            </button>
-          </div>
-        )}
-      </div>
+      {!isSplit ? (
+        <div className="scene-container">
+          {sceneChrome}
+          <SceneViewer
+            ref={canvasRef}
+            {...sceneProps}
+            boxes={boxes}
+            showGt={showGt}
+            showPred={showPred}
+          />
+          <CameraView frameId={frameId} />
+          <SdeOverlay boxes={boxes} />
+          {showMinimap && <Minimap boxes={boxes} />}
 
-      <div className="sidebar">
+          <div className="view-toolbar">
+            <button type="button" className={`view-btn ${viewMode === "both" ? "active" : ""}`} onClick={() => setViewMode("both")}>Combined</button>
+            <button type="button" className={`view-btn ${viewMode === "split" ? "active" : ""}`} onClick={() => setViewMode("split")}>Split</button>
+          </div>
+
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setSidebarOpen((v) => !v)}
+            title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          >
+            {sidebarOpen ? "▶" : "◀"}
+          </button>
+
+          <ObjectDetail box={selectedBox} onClose={() => setSelectedBox(null)} />
+
+          {stats && (
+            <div className={`stats-bar tabular-nums ${loading ? "stats-bar-loading" : ""}`}>
+              <span>Points: {pointCloudData?.count?.toLocaleString() ?? "—"}</span>
+              <span>GT: {stats.gt}</span>
+              <span className="tp">TP: {stats.tp}</span>
+              <span className="fp">FP: {stats.fp}</span>
+              <span className="fn">FN: {stats.fn}</span>
+              <button type="button" className="screenshot-btn" onClick={handleScreenshot} title="Save screenshot (PNG)">
+                Screenshot
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="split-container">
+          {sceneChrome}
+          <div className="split-pane">
+            <span className="split-label split-label-gt">Ground Truth</span>
+            <SceneViewer
+              {...sceneProps}
+              boxes={boxes}
+              showGt={true}
+              showPred={false}
+            />
+          </div>
+          <div className="split-pane">
+            <span className="split-label split-label-pred">Predictions</span>
+            <SceneViewer
+              {...sceneProps}
+              boxes={boxes}
+              showGt={false}
+              showPred={true}
+            />
+          </div>
+
+          <div className="view-toolbar">
+            <button type="button" className={`view-btn ${viewMode === "both" ? "active" : ""}`} onClick={() => setViewMode("both")}>Combined</button>
+            <button type="button" className={`view-btn ${viewMode === "split" ? "active" : ""}`} onClick={() => setViewMode("split")}>Split</button>
+          </div>
+
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setSidebarOpen((v) => !v)}
+            title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          >
+            {sidebarOpen ? "▶" : "◀"}
+          </button>
+        </div>
+      )}
+
+      <div className={`sidebar ${sidebarOpen ? "" : "collapsed"}`}>
         <div className="sidebar-header">
           <h2>Perception Eval</h2>
           {runs.length > 1 && (
@@ -222,6 +368,7 @@ export default function App() {
           currentId={frameId}
           onChange={handleSelectFrame}
           loading={loading}
+          frameStats={frameStats}
         />
         <ControlPanel
           showPointCloud={showPointCloud}
@@ -234,10 +381,20 @@ export default function App() {
           setFilterTypes={setFilterTypes}
           filterMatch={filterMatch}
           setFilterMatch={setFilterMatch}
+          showDistanceRings={showDistanceRings}
+          setShowDistanceRings={setShowDistanceRings}
+          showTrails={showTrails}
+          setShowTrails={setShowTrails}
+          showMotionVectors={showMotionVectors}
+          setShowMotionVectors={setShowMotionVectors}
+          showCorridor={showCorridor}
+          setShowCorridor={setShowCorridor}
+          showMinimap={showMinimap}
+          setShowMinimap={setShowMinimap}
         />
         <MetricsPanel runName={runName} />
         <PRCurve runName={runName} />
-        <FailureBrowser onSelectFrame={handleSelectFrame} />
+        <FailureBrowser onSelectFrame={handleSelectFrame} runName={runName} />
 
         <div className="panel shortcuts-panel">
           <h3>Keyboard Shortcuts</h3>
@@ -247,6 +404,7 @@ export default function App() {
             <kbd>1</kbd><span>Toggle points</span>
             <kbd>2</kbd><span>Toggle GT</span>
             <kbd>3</kbd><span>Toggle preds</span>
+            <kbd>Esc</kbd><span>Close detail / clear highlight</span>
           </div>
         </div>
       </div>

@@ -7,13 +7,13 @@ const TABS = [
   { key: "hallucinations", label: "Hallucinations" },
 ];
 
-export default function FailureBrowser({ onSelectFrame }) {
+export default function FailureBrowser({ onSelectFrame, runName = "waymo_v1" }) {
   const [tab, setTab] = useState("worst_misses");
   const [rows, setRows] = useState([]);
 
   useEffect(() => {
-    fetchFailures(tab).then(setRows).catch(() => setRows([]));
-  }, [tab]);
+    fetchFailures(tab, runName).then(setRows).catch(() => setRows([]));
+  }, [tab, runName]);
 
   return (
     <div className="panel failure-browser">
@@ -36,7 +36,10 @@ export default function FailureBrowser({ onSelectFrame }) {
           <div
             key={i}
             className="failure-row"
-            onClick={() => onSelectFrame(row.frame_id)}
+            title="Jump to frame and highlight this object"
+            onClick={() =>
+              onSelectFrame(row.frame_id, row.highlight_object_id ?? null)
+            }
           >
             <span className="failure-class">{row.class}</span>
             {row.distance_m != null && (

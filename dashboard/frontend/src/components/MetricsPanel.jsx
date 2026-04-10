@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchMetrics } from "../api";
 
-const COLORS = { tp: "#22c55e", fp: "#ef4444", fn: "#eab308" };
-
 function DonutChart({ data }) {
   if (!data || data.length === 0) return null;
   const total = { tp: 0, fp: 0, fn: 0 };
@@ -11,9 +9,9 @@ function DonutChart({ data }) {
   if (sum === 0) return null;
 
   const segments = [
-    { key: "tp", val: total.tp, color: COLORS.tp },
-    { key: "fp", val: total.fp, color: COLORS.fp },
-    { key: "fn", val: total.fn, color: COLORS.fn },
+    { key: "tp", val: total.tp, color: "#00e5ff" },
+    { key: "fp", val: total.fp, color: "#ff5252" },
+    { key: "fn", val: total.fn, color: "#ffc107" },
   ];
 
   let cumAngle = 0;
@@ -21,8 +19,8 @@ function DonutChart({ data }) {
 
   return (
     <div className="chart-block">
-      <h4>Match Distribution</h4>
-      <svg viewBox="0 0 100 100" width="120" height="120">
+      <h4>Match distribution</h4>
+      <svg viewBox="0 0 100 100" width="120" height="120" className="chart-svg">
         {segments.map((seg) => {
           const frac = seg.val / sum;
           const angle = frac * 2 * Math.PI;
@@ -37,18 +35,19 @@ function DonutChart({ data }) {
           const large = frac > 0.5 ? 1 : 0;
           const d = `M${ix1},${iy1} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} L${ix2},${iy2} A${ir},${ir} 0 ${large} 0 ${ix1},${iy1}`;
           cumAngle += angle;
-          return <path key={seg.key} d={d} fill={seg.color} opacity={0.85} />;
+          return <path key={seg.key} d={d} fill={seg.color} opacity={0.92} />;
         })}
-        <text x={cx} y={cy - 3} textAnchor="middle" fill="#eee" fontSize="10" fontWeight="bold">{sum}</text>
-        <text x={cx} y={cy + 8} textAnchor="middle" fill="#888" fontSize="6">total</text>
+        <text x={cx} y={cy - 3} textAnchor="middle" fill="var(--text-primary)" fontSize="10" fontWeight="bold" className="chart-mono">{sum}</text>
+        <text x={cx} y={cy + 8} textAnchor="middle" fill="var(--text-dim)" fontSize="6" className="chart-mono">total</text>
       </svg>
-      <div className="chart-legend-row">
+      <div className="chart-legend-row chart-mono">
         {segments.map((s) => (
           <span key={s.key} style={{ color: s.color, fontSize: 11 }}>
             {s.key.toUpperCase()}: {s.val}
           </span>
         ))}
       </div>
+      <p className="chart-footnote">Counts of TP / FP / FN across all frames in this run (eval_results).</p>
     </div>
   );
 }
@@ -58,27 +57,24 @@ function RecallByDistance({ data }) {
   const bars = data.map((d) => ({
     label: d.d,
     recall: d.tp + d.fn > 0 ? d.tp / (d.tp + d.fn) : 0,
-    sde: d.sde || 0,
   }));
   const maxR = Math.max(...bars.map((b) => b.recall), 0.01);
 
   return (
     <div className="chart-block">
-      <h4>Recall by Distance</h4>
+      <h4>Recall by distance</h4>
       <div className="bar-chart">
         {bars.map((b) => (
           <div key={b.label} className="bar-col">
-            <div className="bar-val">{(b.recall * 100).toFixed(0)}%</div>
+            <div className="bar-val chart-mono">{(b.recall * 100).toFixed(0)}%</div>
             <div className="bar-track">
-              <div
-                className="bar-fill"
-                style={{ height: `${(b.recall / maxR) * 100}%` }}
-              />
+              <div className="bar-fill bar-fill-flat" style={{ height: `${(b.recall / maxR) * 100}%` }} />
             </div>
-            <div className="bar-label">{b.label}m</div>
+            <div className="bar-label chart-mono">{b.label}m</div>
           </div>
         ))}
       </div>
+      <p className="chart-footnote">Recall = TP ÷ (TP + FN) per distance bucket.</p>
     </div>
   );
 }
@@ -94,21 +90,19 @@ function SDEByDistance({ data }) {
 
   return (
     <div className="chart-block">
-      <h4>Mean SDE by Distance</h4>
+      <h4>Mean SDE by distance</h4>
       <div className="bar-chart">
         {bars.map((b) => (
           <div key={b.label} className="bar-col">
-            <div className="bar-val">{b.sde.toFixed(2)}m</div>
+            <div className="bar-val chart-mono">{b.sde.toFixed(2)}m</div>
             <div className="bar-track">
-              <div
-                className="bar-fill sde"
-                style={{ height: `${(b.sde / maxS) * 100}%` }}
-              />
+              <div className="bar-fill bar-fill-flat bar-fill-sde" style={{ height: `${(b.sde / maxS) * 100}%` }} />
             </div>
-            <div className="bar-label">{b.label}m</div>
+            <div className="bar-label chart-mono">{b.label}m</div>
           </div>
         ))}
       </div>
+      <p className="chart-footnote">Mean support-distance error on true positives only, by GT range.</p>
     </div>
   );
 }

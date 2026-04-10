@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import TimelineScrubber from "./TimelineScrubber";
 
 const SPEED_OPTIONS = [
   { label: "0.5×", ms: 2000 },
@@ -7,7 +8,7 @@ const SPEED_OPTIONS = [
   { label: "4×", ms: 250 },
 ];
 
-export default function FrameSelector({ frames, currentId, onChange, loading }) {
+export default function FrameSelector({ frames, currentId, onChange, loading, frameStats }) {
   const [playing, setPlaying] = useState(false);
   const [speedIdx, setSpeedIdx] = useState(1);
   const timerRef = useRef(null);
@@ -39,30 +40,24 @@ export default function FrameSelector({ frames, currentId, onChange, loading }) 
     <div className="panel">
       <h3>Frame</h3>
       <div className="frame-nav">
-        <button
-          className="play-btn"
-          onClick={() => setPlaying(!playing)}
-          title={playing ? "Pause" : "Play"}
-        >
+        <button className="play-btn" onClick={() => setPlaying(!playing)} title={playing ? "Pause" : "Play"}>
           {playing ? "⏸" : "▶"}
         </button>
-        <button disabled={idx <= 0 || loading} onClick={() => onChange(frames[idx - 1].id)}>
-          ◀
-        </button>
+        <button disabled={idx <= 0 || loading} onClick={() => onChange(frames[idx - 1].id)}>◀</button>
         <select value={currentId ?? ""} onChange={(e) => onChange(Number(e.target.value))}>
           {frames.map((f) => (
-            <option key={f.id} value={f.id}>
-              #{f.id} — idx {f.frame_index}
-            </option>
+            <option key={f.id} value={f.id}>#{f.id} — idx {f.frame_index}</option>
           ))}
         </select>
-        <button
-          disabled={idx >= frames.length - 1 || loading}
-          onClick={() => onChange(frames[idx + 1].id)}
-        >
-          ▶
-        </button>
+        <button disabled={idx >= frames.length - 1 || loading} onClick={() => onChange(frames[idx + 1].id)}>▶</button>
       </div>
+
+      <TimelineScrubber
+        frames={frames}
+        currentId={currentId}
+        onChange={onChange}
+        frameStats={frameStats}
+      />
 
       <div className="playback-controls">
         <span className="speed-label">Speed:</span>

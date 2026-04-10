@@ -1,9 +1,28 @@
 venv/
+.venv/
 .idea/
 __pycache__/
 *.pyc
+*.pyo
 
 data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+
+# Generated database (large binary, rebuild with scripts)
+data/eval.db
+
+# Dashboard stale data dir (created when server ran from wrong cwd)
+dashboard/data/
+
+# Frontend build artifacts
+dashboard/frontend/node_modules/
+dashboard/frontend/dist/
+
+# OS files
+.DS_Store
+
+# Environment / secrets
+.env
+.env.*
