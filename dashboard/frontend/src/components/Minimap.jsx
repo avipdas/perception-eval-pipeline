@@ -8,11 +8,11 @@ function MinimapBoxes({ boxes }) {
   const rects = useMemo(() => {
     if (!boxes) return [];
     return boxes.map((b) => {
-      let color = "#546e7a";
+      let color = "#9aa0a6";
       if (b.source === "gt") {
-        color = b.match_type === "TP" ? "#00e5ff" : b.match_type === "FN" ? "#ffc107" : "#546e7a";
+        color = b.match_type === "TP" ? "#1a73e8" : b.match_type === "FN" ? "#fbbc04" : "#9aa0a6";
       } else {
-        color = b.match_type === "TP" ? "#b388ff" : b.match_type === "FP" ? "#ff5252" : "#546e7a";
+        color = b.match_type === "TP" ? "#1ce8b5" : b.match_type === "FP" ? "#ea4335" : "#9aa0a6";
       }
       return { ...b, color };
     });
@@ -50,12 +50,12 @@ export default function Minimap({ boxes }) {
           far: 200,
           up: [0, 1, 0],
         }}
-        style={{ background: "#060920" }}
+        style={{ background: "#0d1117" }}
       >
         {/* ground grid */}
         <mesh position={[20, 0, -1]}>
           <planeGeometry args={[MINIMAP_RANGE * 2, MINIMAP_RANGE * 2]} />
-          <meshBasicMaterial color="#0a0e27" />
+          <meshBasicMaterial color="#0d1117" />
         </mesh>
 
         {/* range circles */}
@@ -75,7 +75,7 @@ export default function Minimap({ boxes }) {
                   itemSize={3}
                 />
               </bufferGeometry>
-              <lineBasicMaterial color="#1e2660" transparent opacity={0.5} />
+              <lineBasicMaterial color="#2a3344" transparent opacity={0.5} />
             </line>
           );
         })}

@@ -152,13 +152,22 @@ def get_boxes(frame_id: int, run_name: str = "waymo_v1"):
                 "height": gt.height,
                 "heading": gt.heading,
                 "range": gt.range,
+                "speed_x": gt.speed_x,
+                "speed_y": gt.speed_y,
+                "num_lidar_points": gt.num_lidar_points,
+                "detection_difficulty": gt.detection_difficulty,
+                "tracking_difficulty": gt.tracking_difficulty,
                 "match_type": er.match_type if er else None,
+                "matched_object_id": f"pred_{er.prediction_id}" if er and er.match_type == "TP" and er.prediction_id else None,
                 "iou": er.iou if er else None,
                 "sde": er.sde if er else None,
                 "signed_sde": er.signed_sde if er else None,
                 "heading_accuracy": er.heading_accuracy if er else None,
                 "confidence": None,
             })
+
+        # Build lookup from GT database ID → GT object_id for pairing
+        gt_db_id_to_object_id = {gt.id: gt.object_id for gt in gts}
 
         # Predictions
         preds = s.query(Prediction).filter(Prediction.frame_id == frame_id).all()
@@ -177,6 +186,9 @@ def get_boxes(frame_id: int, run_name: str = "waymo_v1"):
 
         for pred in preds:
             er = pred_eval_map.get(pred.id)
+            matched_gt_oid = None
+            if er and er.match_type == "TP" and er.ground_truth_id:
+                matched_gt_oid = gt_db_id_to_object_id.get(er.ground_truth_id)
             boxes.append({
                 "source": "pred",
                 "object_id": f"pred_{pred.id}",
@@ -190,6 +202,7 @@ def get_boxes(frame_id: int, run_name: str = "waymo_v1"):
                 "heading": pred.heading,
                 "range": pred.range,
                 "match_type": er.match_type if er else None,
+                "matched_object_id": matched_gt_oid,
                 "iou": er.iou if er else None,
                 "sde": er.sde if er else None,
                 "signed_sde": er.signed_sde if er else None,

@@ -18,7 +18,7 @@ export default function PointCloud({ data, visible = true }) {
 
     const cLow = new THREE.Color("#4a148c");
     const cMid = new THREE.Color("#00bcd4");
-    const cHigh = new THREE.Color("#e8eaf6");
+    const cHigh = new THREE.Color("#ffffff");
 
     for (let i = 0; i < n; i++) {
       const x = buf[i * 4 + 0];

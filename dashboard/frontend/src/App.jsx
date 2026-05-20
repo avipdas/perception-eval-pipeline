@@ -70,6 +70,7 @@ export default function App() {
   const [sessionStartedAt] = useState(() => formatSessionTime(new Date()));
 
   const canvasRef = useRef(null);
+  const splitCameraRef = useRef({ position: null, target: null, source: null, version: 0 });
   /** Monotonic id so out-of-order point cloud / box responses never overwrite the current frame. */
   const fetchSeqRef = useRef(0);
 
@@ -319,6 +320,8 @@ export default function App() {
               boxes={boxes}
               showGt={true}
               showPred={false}
+              syncCamera={splitCameraRef}
+              syncId="gt"
             />
           </div>
           <div className="split-pane">
@@ -328,6 +331,8 @@ export default function App() {
               boxes={boxes}
               showGt={false}
               showPred={true}
+              syncCamera={splitCameraRef}
+              syncId="pred"
             />
           </div>
 

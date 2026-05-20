@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { fetchPRCurve } from "../api";
 
 const CLASS_COLORS = {
-  VEHICLE: "#00e5ff",
-  PEDESTRIAN: "#ffc107",
-  CYCLIST: "#b388ff",
+  VEHICLE: "#1a73e8",
+  PEDESTRIAN: "#fbbc04",
+  CYCLIST: "#1ce8b5",
 };
 
 const W = 260, H = 180, PAD = 30;
@@ -69,7 +69,7 @@ export default function PRCurve({ runName }) {
         </text>
 
         {entries.map(([name, pts]) => {
-          const color = CLASS_COLORS[name] || "#7986cb";
+          const color = CLASS_COLORS[name] || "#9aa0a6";
           const d = pts.map((p, i) => {
             const [x, y] = toSvg(p.r, p.p);
             return `${i === 0 ? "M" : "L"}${x},${y}`;
@@ -96,7 +96,7 @@ export default function PRCurve({ runName }) {
 
       <div className="pr-legend chart-mono">
         {entries.map(([name]) => (
-          <span key={name} style={{ color: CLASS_COLORS[name] || "#7986cb", fontSize: 11, marginRight: 10 }}>
+          <span key={name} style={{ color: CLASS_COLORS[name] || "#9aa0a6", fontSize: 11, marginRight: 10 }}>
             ● {name}
           </span>
         ))}

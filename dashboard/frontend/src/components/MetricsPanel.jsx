@@ -9,9 +9,9 @@ function DonutChart({ data }) {
   if (sum === 0) return null;
 
   const segments = [
-    { key: "tp", val: total.tp, color: "#00e5ff" },
-    { key: "fp", val: total.fp, color: "#ff5252" },
-    { key: "fn", val: total.fn, color: "#ffc107" },
+    { key: "tp", val: total.tp, color: "#1ce8b5" },
+    { key: "fp", val: total.fp, color: "#ea4335" },
+    { key: "fn", val: total.fn, color: "#fbbc04" },
   ];
 
   let cumAngle = 0;

@@ -50,9 +50,9 @@ export default function TimelineScrubber({ frames, currentId, onChange, frameSta
     const range = maxS - minS || 1;
     const maxTotal = Math.max(...totals);
 
-    const RED = "#ff5252";
-    const YELLOW = "#ffc107";
-    const GREEN = "#69f0ae";
+    const RED = "#ea4335";
+    const YELLOW = "#fbbc04";
+    const GREEN = "#1ce8b5";
 
     const map = {};
     for (const f of frames) {
@@ -85,7 +85,7 @@ export default function TimelineScrubber({ frames, currentId, onChange, frameSta
           {frames.map((f, i) => {
             const q = qualityMap[f.id];
             const isCurrent = i === idx;
-            let bg = "#2a3070";
+            let bg = "#2a3344";
             let h = "40%";
             let op = 0.5;
             if (q != null) {
@@ -98,7 +98,7 @@ export default function TimelineScrubber({ frames, currentId, onChange, frameSta
                 key={f.id}
                 className="timeline-tick"
                 style={{
-                  background: isCurrent ? "#00e5ff" : bg,
+                  background: isCurrent ? "#1a73e8" : bg,
                   height: isCurrent ? "100%" : h,
                   opacity: isCurrent ? 1 : op,
                   borderRadius: 2,

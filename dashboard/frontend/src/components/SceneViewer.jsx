@@ -1,5 +1,5 @@
-import { forwardRef, useMemo, useRef } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { forwardRef, useCallback, useMemo, useRef } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, GizmoHelper, GizmoViewport, Html, Line } from "@react-three/drei";
 import * as THREE from "three";
 import PointCloud from "./PointCloud";
@@ -45,11 +45,11 @@ function EgoVehicle() {
       {/* tail lights */}
       <mesh position={[-2.35, 0.75, 0.45]}>
         <sphereGeometry args={[0.1, 8, 8]} />
-        <meshStandardMaterial color="#ff5252" emissive="#ff5252" emissiveIntensity={1.5} />
+        <meshStandardMaterial color="#ea4335" emissive="#ea4335" emissiveIntensity={1.5} />
       </mesh>
       <mesh position={[-2.35, -0.75, 0.45]}>
         <sphereGeometry args={[0.1, 8, 8]} />
-        <meshStandardMaterial color="#ff5252" emissive="#ff5252" emissiveIntensity={1.5} />
+        <meshStandardMaterial color="#ea4335" emissive="#ea4335" emissiveIntensity={1.5} />
       </mesh>
       {/* roof LIDAR pod */}
       <mesh position={[-0.3, 0, 1.45]}>
@@ -58,7 +58,7 @@ function EgoVehicle() {
       </mesh>
       <mesh position={[-0.3, 0, 1.6]}>
         <sphereGeometry args={[0.15, 12, 12]} />
-        <meshStandardMaterial color="#00e5ff" emissive="#00e5ff" emissiveIntensity={0.5} metalness={0.3} roughness={0.5} />
+        <meshStandardMaterial color="#1ce8b5" emissive="#1ce8b5" emissiveIntensity={0.5} metalness={0.3} roughness={0.5} />
       </mesh>
     </group>
   );
@@ -79,28 +79,28 @@ function GroundPlane() {
       {/* far ground */}
       <mesh position={[0, 0, -1.52]} rotation={[0, 0, 0]}>
         <planeGeometry args={[300, 300]} />
-        <meshStandardMaterial color="#080b1e" />
+        <meshStandardMaterial color="#0d1117" />
       </mesh>
       {/* road surface */}
       <mesh position={[20, 0, -1.51]}>
         <planeGeometry args={[200, 12]} />
-        <meshStandardMaterial color="#0d1030" />
+        <meshStandardMaterial color="#161b22" />
       </mesh>
       {/* lane lines - left */}
       <mesh position={[20, 3.5, -1.50]}>
         <planeGeometry args={[200, 0.12]} />
-        <meshBasicMaterial color="#1e2660" />
+        <meshBasicMaterial color="#2a3344" />
       </mesh>
       {/* lane lines - right */}
       <mesh position={[20, -3.5, -1.50]}>
         <planeGeometry args={[200, 0.12]} />
-        <meshBasicMaterial color="#1e2660" />
+        <meshBasicMaterial color="#2a3344" />
       </mesh>
       {/* center lane dashes */}
       {dashes.map((x) => (
         <mesh key={x} position={[x + 1.5, 0, -1.50]}>
           <planeGeometry args={[3, 0.1]} />
-          <meshBasicMaterial color="#2a3380" />
+          <meshBasicMaterial color="#3d4f6a" />
         </mesh>
       ))}
     </group>
@@ -123,18 +123,18 @@ function SafetyCorridor({ visible }) {
     <group>
       <mesh ref={meshRef} position={[25, 0, 0]}>
         <boxGeometry args={[50, 3, 3]} />
-        <meshBasicMaterial color="#00e5ff" transparent opacity={0.06} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#1a73e8" transparent opacity={0.06} side={THREE.DoubleSide} />
       </mesh>
       <lineSegments position={[25, 0, 0]}>
         <edgesGeometry args={[new THREE.BoxGeometry(50, 3, 3)]} />
-        <lineBasicMaterial color="#00e5ff" transparent opacity={0.25} />
+        <lineBasicMaterial color="#1a73e8" transparent opacity={0.25} />
       </lineSegments>
     </group>
   );
 }
 
 /* ── Distance Rings ────────────────────────────────────────── */
-function DistanceRing({ radius, color = "#1e2660", label }) {
+function DistanceRing({ radius, color = "#2a3344", label }) {
   const points = useMemo(() => {
     const pts = [];
     for (let i = 0; i <= 128; i++) {
@@ -148,7 +148,7 @@ function DistanceRing({ radius, color = "#1e2660", label }) {
     <group>
       <Line points={points} color={color} lineWidth={1} transparent opacity={0.35} />
       <Html position={[radius + 1.5, 0, -1.49]} center style={{ pointerEvents: "none" }}>
-        <span style={{ color: "#5c6bc0", fontSize: 9, fontFamily: "'Roboto Mono', monospace", whiteSpace: "nowrap", letterSpacing: "0.5px" }}>
+        <span style={{ color: "#6b7280", fontSize: 9, fontFamily: "'Roboto Mono', monospace", whiteSpace: "nowrap", letterSpacing: "0.5px" }}>
           {label}
         </span>
       </Html>
@@ -181,9 +181,51 @@ function TrackingTrails({ trailBuffer }) {
   return (
     <group>
       {trails.map((pts, i) => (
-        <Line key={i} points={pts} color="#00bcd4" lineWidth={2} transparent opacity={0.4} />
+        <Line key={i} points={pts} color="#1a73e8" lineWidth={2} transparent opacity={0.4} />
       ))}
     </group>
+  );
+}
+
+/* ── Orbit Controls with optional camera sync for split view ── */
+function SyncableControls({ syncCamera, syncId }) {
+  const { camera } = useThree();
+  const controlsRef = useRef();
+  const lastVersion = useRef(0);
+  const applying = useRef(false);
+
+  const handleChange = useCallback(() => {
+    if (applying.current || !syncCamera?.current || !controlsRef.current) return;
+    syncCamera.current = {
+      position: camera.position.toArray(),
+      target: controlsRef.current.target.toArray(),
+      source: syncId,
+      version: (syncCamera.current.version || 0) + 1,
+    };
+  }, [syncCamera, syncId, camera]);
+
+  useFrame(() => {
+    if (!syncCamera?.current || !controlsRef.current) return;
+    const s = syncCamera.current;
+    if (s.source !== syncId && s.version > lastVersion.current) {
+      lastVersion.current = s.version;
+      applying.current = true;
+      camera.position.fromArray(s.position);
+      controlsRef.current.target.fromArray(s.target);
+      controlsRef.current.update();
+      applying.current = false;
+    }
+  });
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      target={[15, 0, 0]}
+      enableDamping
+      dampingFactor={0.1}
+      maxPolarAngle={Math.PI * 0.85}
+      onChange={syncCamera ? handleChange : undefined}
+    />
   );
 }
 
@@ -206,6 +248,8 @@ const SceneViewer = forwardRef(function SceneViewer(
     showMotionVectors = true,
     onSelectBox,
     selectedBoxId,
+    syncCamera = null,
+    syncId = null,
   },
   ref
 ) {
@@ -213,21 +257,21 @@ const SceneViewer = forwardRef(function SceneViewer(
     <Canvas
       ref={ref}
       camera={{ position: [-15, 0, 20], fov: 65, near: 0.1, far: 500, up: [0, 0, 1] }}
-      style={{ background: "#060920" }}
+      style={{ background: "#0d1117" }}
       gl={{ preserveDrawingBuffer: true }}
       onCreated={({ camera }) => { camera.up.set(0, 0, 1); camera.lookAt(15, 0, 0); }}
     >
       <ambientLight intensity={0.3} />
       <directionalLight position={[10, 10, 20]} intensity={0.5} />
-      <directionalLight position={[-10, -10, 15]} intensity={0.15} color="#b388ff" />
+      <directionalLight position={[-10, -10, 15]} intensity={0.15} color="#1a73e8" />
 
       <GroundPlane />
 
       {showDistanceRings && (
         <>
-          <DistanceRing radius={30} color="#1e88e5" label="30 m" />
-          <DistanceRing radius={50} color="#7c4dff" label="50 m" />
-          <DistanceRing radius={75} color="#ff5252" label="75 m" />
+          <DistanceRing radius={30} color="#1a73e8" label="30 m" />
+          <DistanceRing radius={50} color="#1ce8b5" label="50 m" />
+          <DistanceRing radius={75} color="#ea4335" label="75 m" />
         </>
       )}
 
@@ -250,12 +294,7 @@ const SceneViewer = forwardRef(function SceneViewer(
 
       {showTrails && <TrackingTrails trailBuffer={trailBuffer} />}
 
-      <OrbitControls
-        target={[15, 0, 0]}
-        enableDamping
-        dampingFactor={0.1}
-        maxPolarAngle={Math.PI * 0.85}
-      />
+      <SyncableControls syncCamera={syncCamera} syncId={syncId} />
 
       <GizmoHelper alignment="bottom-right" margin={[60, 60]}>
         <GizmoViewport labelColor="white" axisHeadScale={0.8} />

@@ -6,12 +6,12 @@ import { useFrame } from "@react-three/fiber";
 const TYPE_NAMES = { 1: "VEHICLE", 2: "PEDESTRIAN", 4: "CYCLIST" };
 
 const BOX_COLORS = {
-  gt_tp: "#00e5ff",
-  gt_fn: "#ffc107",
-  gt_none: "#546e7a",
-  pred_tp: "#b388ff",
-  pred_fp: "#ff5252",
-  pred_none: "#546e7a",
+  gt_tp: "#1a73e8",
+  gt_fn: "#fbbc04",
+  gt_none: "#9aa0a6",
+  pred_tp: "#1ce8b5",
+  pred_fp: "#ea4335",
+  pred_none: "#9aa0a6",
 };
 
 function boxColor(box) {
@@ -34,10 +34,10 @@ function HeadingArrow({ box }) {
   const { points, color } = useMemo(() => {
     const len = Math.min(box.length * 0.6, 3);
     const acc = box.heading_accuracy;
-    let c = "#69f0ae";
+    let c = "#1ce8b5";
     if (acc != null) {
-      if (acc < 0.7) c = "#ff5252";
-      else if (acc < 0.9) c = "#ffc107";
+      if (acc < 0.7) c = "#ea4335";
+      else if (acc < 0.9) c = "#fbbc04";
     }
     const cos = Math.cos(box.heading);
     const sin = Math.sin(box.heading);
@@ -75,26 +75,130 @@ function HeadingArrow({ box }) {
 }
 
 /* ── Motion Vector (GT→Pred offset for TPs) ───────────────── */
+function MotionVectorArrow({ pair }) {
+  const [hovered, setHovered] = useState(false);
+
+  const markerPos = useMemo(() => {
+    const topZ = Math.max(
+      pair.gt.center_z + pair.gt.height / 2,
+      pair.pred.center_z + pair.pred.height / 2,
+    );
+    return [
+      (pair.from[0] + pair.to[0]) / 2,
+      (pair.from[1] + pair.to[1]) / 2,
+      topZ + 0.6,
+    ];
+  }, [pair]);
+
+  const tooltipPos = useMemo(() => [
+    markerPos[0], markerPos[1], markerPos[2] + 1.2,
+  ], [markerPos]);
+
+  const gt = pair.gt;
+  const pred = pair.pred;
+  const speed = Math.sqrt((gt.speed_x ?? 0) ** 2 + (gt.speed_y ?? 0) ** 2);
+  const headingDeg = ((gt.heading * 180) / Math.PI).toFixed(1);
+  const offsetDist = Math.sqrt(
+    (pred.center_x - gt.center_x) ** 2 +
+    (pred.center_y - gt.center_y) ** 2 +
+    (pred.center_z - gt.center_z) ** 2,
+  ).toFixed(3);
+
+  return (
+    <group>
+      <Line
+        points={[pair.from, pair.to]}
+        color={hovered ? "#1ce8b5" : "#1a73e8"}
+        lineWidth={hovered ? 3 : 2}
+        dashed
+        dashSize={0.3}
+        gapSize={0.15}
+        raycast={() => null}
+      />
+      {/* Hoverable diamond marker above the midpoint */}
+      <mesh
+        position={markerPos}
+        rotation={[0, 0, Math.PI / 4]}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <boxGeometry args={[0.5, 0.5, 0.5]} />
+        <meshBasicMaterial
+          color={hovered ? "#1ce8b5" : "#1a73e8"}
+          transparent
+          opacity={hovered ? 0.9 : 0.55}
+          depthTest={false}
+        />
+      </mesh>
+      {hovered && (
+        <Html position={tooltipPos} center style={{ pointerEvents: "none" }}>
+          <div style={{
+            background: "rgba(13,17,23,0.94)",
+            color: "#ffffff",
+            padding: "8px 12px",
+            borderRadius: 8,
+            fontSize: 11,
+            whiteSpace: "nowrap",
+            fontFamily: "'Roboto Mono', monospace",
+            border: "1px solid #1a73e8",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+            minWidth: 180,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <strong style={{ color: "#1a73e8" }}>{TYPE_NAMES[gt.object_type] || "?"}</strong>
+              <span style={{ fontSize: 10, color: "#9aa0a6" }}>GT → Pred offset</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 12px", fontSize: 10 }}>
+              <span style={{ color: "#9aa0a6" }}>Speed</span>
+              <span style={{ fontWeight: 600 }}>{speed.toFixed(1)} m/s</span>
+              <span style={{ color: "#9aa0a6" }}>Velocity</span>
+              <span style={{ fontWeight: 600 }}>({(gt.speed_x ?? 0).toFixed(1)}, {(gt.speed_y ?? 0).toFixed(1)})</span>
+              <span style={{ color: "#9aa0a6" }}>Heading</span>
+              <span style={{ fontWeight: 600 }}>{headingDeg}°</span>
+              <span style={{ color: "#9aa0a6" }}>Range</span>
+              <span style={{ fontWeight: 600 }}>{gt.range?.toFixed(1)}m</span>
+              <span style={{ color: "#9aa0a6" }}>LiDAR pts</span>
+              <span style={{ fontWeight: 600 }}>{gt.num_lidar_points ?? "—"}</span>
+              <span style={{ color: "#9aa0a6" }}>Offset</span>
+              <span style={{ fontWeight: 600, color: "#1ce8b5" }}>{offsetDist}m</span>
+              {gt.iou != null && <>
+                <span style={{ color: "#9aa0a6" }}>IoU</span>
+                <span style={{ fontWeight: 600 }}>{gt.iou.toFixed(3)}</span>
+              </>}
+              {gt.heading_accuracy != null && <>
+                <span style={{ color: "#9aa0a6" }}>Head. Acc</span>
+                <span style={{ fontWeight: 600 }}>{gt.heading_accuracy.toFixed(3)}</span>
+              </>}
+              {gt.detection_difficulty != null && <>
+                <span style={{ color: "#9aa0a6" }}>Difficulty</span>
+                <span style={{ fontWeight: 600 }}>{gt.detection_difficulty === 0 ? "Easy" : "Hard"}</span>
+              </>}
+            </div>
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
 function MotionVectors({ boxes }) {
   const pairs = useMemo(() => {
     if (!boxes) return [];
-    const gtMap = {};
-    const predMap = {};
-    boxes.forEach((b) => {
-      if (b.match_type === "TP") {
-        if (b.source === "gt") gtMap[b.object_id] = b;
-        else predMap[b.object_id] = b;
-      }
-    });
+    const byId = {};
+    boxes.forEach((b) => { byId[b.object_id] = b; });
+
     const result = [];
-    Object.keys(gtMap).forEach((id) => {
-      if (predMap[id]) {
-        const g = gtMap[id];
-        const p = predMap[id];
-        result.push({
-          from: [g.center_x, g.center_y, g.center_z],
-          to: [p.center_x, p.center_y, p.center_z],
-        });
+    boxes.forEach((b) => {
+      if (b.source === "gt" && b.match_type === "TP" && b.matched_object_id) {
+        const pred = byId[b.matched_object_id];
+        if (pred) {
+          result.push({
+            from: [b.center_x, b.center_y, b.center_z],
+            to: [pred.center_x, pred.center_y, pred.center_z],
+            gt: b,
+            pred,
+          });
+        }
       }
     });
     return result;
@@ -105,15 +209,7 @@ function MotionVectors({ boxes }) {
   return (
     <group>
       {pairs.map((pair, i) => (
-        <Line
-          key={i}
-          points={[pair.from, pair.to]}
-          color="#e040fb"
-          lineWidth={2}
-          dashed
-          dashSize={0.3}
-          gapSize={0.15}
-        />
+        <MotionVectorArrow key={i} pair={pair} />
       ))}
     </group>
   );
@@ -139,7 +235,7 @@ function CorridorGlow({ box }) {
     <group matrixAutoUpdate={false} matrix={matrix}>
       <mesh ref={meshRef}>
         <boxGeometry args={[box.length + 0.4, box.width + 0.4, box.height + 0.4]} />
-        <meshBasicMaterial color="#ff5252" transparent opacity={0.2} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#ea4335" transparent opacity={0.2} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
@@ -170,7 +266,7 @@ function FailureHighlightPointer({ boxes, highlightId }) {
 
   if (!spec) return null;
   const { cx, cy, stemTop, joinZ, tipZ, wing } = spec;
-  const col = "#ffea00";
+  const col = "#fbbc04";
 
   return (
     <group ref={groupRef}>
@@ -187,14 +283,13 @@ function FailureHighlightPointer({ boxes, highlightId }) {
 
 /* ── Wireframe Box ─────────────────────────────────────────── */
 function WireframeBox({ box, onHover, onUnhover, selected, onClick }) {
-  const { geometry, matrix } = useMemo(() => {
-    const geo = new THREE.EdgesGeometry(
-      new THREE.BoxGeometry(box.length, box.width, box.height)
-    );
+  const { edgesGeo, fillGeo, matrix } = useMemo(() => {
+    const boxGeo = new THREE.BoxGeometry(box.length, box.width, box.height);
+    const edges = new THREE.EdgesGeometry(boxGeo);
     const mat = new THREE.Matrix4();
     mat.makeRotationZ(box.heading);
     mat.setPosition(box.center_x, box.center_y, box.center_z);
-    return { geometry: geo, matrix: mat };
+    return { edgesGeo: edges, fillGeo: boxGeo, matrix: mat };
   }, [box]);
 
   const color = boxColor(box);
@@ -202,12 +297,16 @@ function WireframeBox({ box, onHover, onUnhover, selected, onClick }) {
 
   return (
     <group matrixAutoUpdate={false} matrix={matrix}>
-      <lineSegments
-        geometry={geometry}
+      {/* Invisible fill mesh for reliable click/hover hit detection */}
+      <mesh
+        geometry={fillGeo}
         onPointerOver={(e) => { e.stopPropagation(); onHover(box); }}
         onPointerOut={() => onUnhover()}
         onClick={(e) => { e.stopPropagation(); onClick?.(box); }}
       >
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      <lineSegments geometry={edgesGeo}>
         <lineBasicMaterial color={color} linewidth={lineWidth} />
       </lineSegments>
     </group>
@@ -227,8 +326,8 @@ function Tooltip({ box }) {
     >
       <div
         style={{
-          background: "rgba(10,14,39,0.92)",
-          color: "#e8eaf6",
+          background: "rgba(13,17,23,0.92)",
+          color: "#ffffff",
           padding: "8px 12px",
           borderRadius: 8,
           fontSize: 11,
@@ -240,44 +339,44 @@ function Tooltip({ box }) {
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <strong style={{ fontSize: 12, color: "#e8eaf6" }}>{type}</strong>
-          <span style={{ fontSize: 10, color: "#7986cb" }}>
+          <strong style={{ fontSize: 12, color: "#ffffff" }}>{type}</strong>
+          <span style={{ fontSize: 10, color: "#9aa0a6" }}>
             {box.source.toUpperCase()} {box.match_type && `· ${box.match_type}`}
           </span>
         </div>
         {box.sde != null && (
           <div style={{
-            background: isDangerous ? "rgba(255,82,82,0.12)" : "rgba(105,240,174,0.08)",
-            border: `1px solid ${isDangerous ? "#ff5252" : "#69f0ae"}`,
+            background: isDangerous ? "rgba(234,67,53,0.12)" : "rgba(28,232,181,0.08)",
+            border: `1px solid ${isDangerous ? "#ea4335" : "#1ce8b5"}`,
             borderRadius: 4,
             padding: "4px 8px",
             marginBottom: 4,
             display: "flex",
             justifyContent: "space-between",
           }}>
-            <span style={{ color: "#9fa8da" }}>SDE</span>
-            <span style={{ fontWeight: 700, color: isDangerous ? "#ff5252" : "#69f0ae" }}>
+            <span style={{ color: "#d1d5db" }}>SDE</span>
+            <span style={{ fontWeight: 700, color: isDangerous ? "#ea4335" : "#1ce8b5" }}>
               {box.sde.toFixed(3)}m {isDangerous ? "DANGER" : "safe"}
             </span>
           </div>
         )}
         {box.signed_sde != null && (
-          <div style={{ fontSize: 10, color: "#5c6bc0", marginBottom: 2 }}>
+          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>
             Signed: {box.signed_sde.toFixed(3)}m
             {box.signed_sde > 0 ? " (closer)" : " (farther)"}
           </div>
         )}
-        <div style={{ display: "flex", gap: 12, marginTop: 4, color: "#c5cae9" }}>
+        <div style={{ display: "flex", gap: 12, marginTop: 4, color: "#d1d5db" }}>
           {box.iou != null && <span>IoU: <strong>{box.iou.toFixed(3)}</strong></span>}
           {box.confidence != null && <span>Conf: <strong>{box.confidence.toFixed(3)}</strong></span>}
         </div>
         {box.heading_accuracy != null && (
-          <div style={{ fontSize: 10, color: "#5c6bc0", marginTop: 2 }}>
+          <div style={{ fontSize: 10, color: "#6b7280", marginTop: 2 }}>
             Heading: {box.heading_accuracy.toFixed(3)}
           </div>
         )}
         {box.range != null && (
-          <div style={{ fontSize: 10, color: "#5c6bc0" }}>
+          <div style={{ fontSize: 10, color: "#6b7280" }}>
             Range: {box.range.toFixed(1)}m
           </div>
         )}
