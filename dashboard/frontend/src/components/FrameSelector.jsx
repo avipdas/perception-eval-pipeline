@@ -8,7 +8,7 @@ const SPEED_OPTIONS = [
   { label: "4×", ms: 250 },
 ];
 
-export default function FrameSelector({ frames, currentId, onChange, loading, frameStats }) {
+export default function FrameSelector({ frames, currentId, onChange, loading, frameStats, triageSummary = {} }) {
   const [playing, setPlaying] = useState(false);
   const [speedIdx, setSpeedIdx] = useState(1);
   const timerRef = useRef(null);
@@ -57,6 +57,7 @@ export default function FrameSelector({ frames, currentId, onChange, loading, fr
         currentId={currentId}
         onChange={onChange}
         frameStats={frameStats}
+        triageSummary={triageSummary}
       />
 
       <div className="playback-controls">

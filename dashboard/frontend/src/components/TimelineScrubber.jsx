@@ -7,7 +7,7 @@ function lerpColor(a, b, t) {
   return `#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${bl.toString(16).padStart(2,"0")}`;
 }
 
-export default function TimelineScrubber({ frames, currentId, onChange, frameStats }) {
+export default function TimelineScrubber({ frames, currentId, onChange, frameStats, triageSummary = {} }) {
   const trackRef = useRef(null);
 
   const idx = frames.findIndex((f) => f.id === currentId);
@@ -93,6 +93,9 @@ export default function TimelineScrubber({ frames, currentId, onChange, frameSta
               h = `${Math.max(30, Math.min(100, q.heightPct))}%`;
               op = 0.85;
             }
+            const ts = triageSummary[String(f.id)];
+            const hasCritical = ts?.critical > 0;
+            const hasHigh     = !hasCritical && ts?.high > 0;
             return (
               <div
                 key={f.id}
@@ -102,8 +105,23 @@ export default function TimelineScrubber({ frames, currentId, onChange, frameSta
                   height: isCurrent ? "100%" : h,
                   opacity: isCurrent ? 1 : op,
                   borderRadius: 2,
+                  position: "relative",
                 }}
-              />
+              >
+                {(hasCritical || hasHigh) && (
+                  <div style={{
+                    position: "absolute",
+                    top: -3,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    width: 4,
+                    height: 4,
+                    borderRadius: "50%",
+                    background: hasCritical ? "#ef4444" : "#f97316",
+                    pointerEvents: "none",
+                  }} />
+                )}
+              </div>
             );
           })}
         </div>

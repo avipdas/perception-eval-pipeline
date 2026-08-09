@@ -43,7 +43,7 @@ DEFAULT_OUTPUT = _REPO_ROOT / "data" / "processed" / "scene_texts.jsonl"
 DEFAULT_RUN    = "waymo_v1"
 
 
-def parse_args() -> argparse.Namespace:
+def iparse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Serialize 3-D perception eval results to natural language text."
     )

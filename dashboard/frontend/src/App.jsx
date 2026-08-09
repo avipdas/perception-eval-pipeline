@@ -10,7 +10,8 @@ import SdeOverlay from "./components/SdeOverlay";
 import Minimap from "./components/Minimap";
 import ObjectDetail from "./components/ObjectDetail";
 import RunMetadataStrip from "./components/RunMetadataStrip";
-import { fetchFrames, fetchPointCloud, fetchBoxes, fetchRuns, fetchFrameStats } from "./api";
+import TriagePanel from "./components/TriagePanel";
+import { fetchFrames, fetchPointCloud, fetchBoxes, fetchRuns, fetchFrameStats, fetchTriageFrame, fetchTriageSummary } from "./api";
 import "./App.css";
 
 const TRAIL_SIZE = 5;
@@ -67,6 +68,10 @@ export default function App() {
   const [showMotionVectors, setShowMotionVectors] = useState(true);
   const [showMinimap, setShowMinimap] = useState(true);
 
+  const [triageResult, setTriageResult] = useState(null);
+  const [triageLoading, setTriageLoading] = useState(false);
+  const [triageSummary, setTriageSummary] = useState({});
+
   const [sessionStartedAt] = useState(() => formatSessionTime(new Date()));
 
   const canvasRef = useRef(null);
@@ -98,6 +103,10 @@ export default function App() {
       .then((stats) => setFrameStats((prev) => ({ ...prev, ...stats })))
       .catch(() => {});
   }, [runName]);
+
+  useEffect(() => {
+    fetchTriageSummary().then(setTriageSummary).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (frameId == null) return;
@@ -148,6 +157,14 @@ export default function App() {
       })
       .catch((err) => console.error("Boxes:", err))
       .finally(finishOne);
+
+    // Triage fetch (fire-and-forget, does not block loading spinner)
+    setTriageLoading(true);
+    setTriageResult(null);
+    fetchTriageFrame(frameId)
+      .then((r) => { if (applyIfCurrent()) setTriageResult(r); })
+      .catch(() => { if (applyIfCurrent()) setTriageResult(null); })
+      .finally(() => { if (applyIfCurrent()) setTriageLoading(false); });
 
     return () => {
       cancelled = true;
@@ -374,6 +391,7 @@ export default function App() {
           onChange={handleSelectFrame}
           loading={loading}
           frameStats={frameStats}
+          triageSummary={triageSummary}
         />
         <ControlPanel
           showPointCloud={showPointCloud}
@@ -399,6 +417,11 @@ export default function App() {
         />
         <MetricsPanel runName={runName} />
         <PRCurve runName={runName} />
+        <TriagePanel
+          triageResult={triageResult}
+          loading={triageLoading}
+          onHighlight={setHighlightId}
+        />
         <FailureBrowser onSelectFrame={handleSelectFrame} runName={runName} />
 
         <div className="panel shortcuts-panel">

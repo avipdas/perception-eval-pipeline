@@ -197,6 +197,54 @@ def load_scenes(
 
 
 # ---------------------------------------------------------------------------
+# Pretty-print helper
+# ---------------------------------------------------------------------------
+
+_SEV_ICON = {
+    "critical":   "🔴",
+    "high":       "🟠",
+    "medium":     "🟡",
+    "low-medium": "🟡",
+    "low":        "🟢",
+    "negligible": "⚪",
+}
+
+
+def _print_result(result: "TriageResult") -> None:
+    """Print every field from to_dict() in a human-readable format."""
+    sep = "  " + "─" * 68
+    print(sep)
+    print(f"  Frame {result.frame_index}  (frame_id={result.frame_id})")
+    print(f"  Conditions : {result.conditions}")
+    print(f"  Model      : {result.model}  |  latency {result.latency_s:.1f}s")
+    print(f"  Counts     : critical={result.critical_count}  high={result.high_count}  "
+          f"tier2={result.tier2_count}  total={len(result.findings)}")
+    if result.frame_summary:
+        print(f"\n  Summary    : {result.frame_summary}")
+
+    if result.findings:
+        print(f"\n  Findings:")
+        for f in result.findings:
+            icon = _SEV_ICON.get(f.safety_severity or "", "  ")
+            tier_str = f"T{f.tier}" if f.tier else "  "
+            code_str = f.failure_code or "clean TP"
+            label_str = f.label or ""
+            range_str = f"{f.range_m:.1f} m" if f.range_m is not None else "—"
+            print(
+                f"\n  {icon} [{f.event_type}] #{f.object_index} {f.object_class} "
+                f"at {range_str}  |  {tier_str} {code_str}"
+            )
+            if label_str:
+                print(f"     Label    : {label_str}")
+            print(f"     Severity : {f.safety_severity or '—'}  |  "
+                  f"Confidence : {f.confidence:.2f}")
+            print(f"     Rationale: {f.rationale}")
+            if f.recommended_action:
+                print(f"     Action   : {f.recommended_action}")
+    print(sep)
+
+
+# ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
 
@@ -350,11 +398,14 @@ class TriagePipeline:
             )
             result = self.classify_frame(scene, mode=mode)
             results.append(result)
-            status = "ERROR" if result.error else (
-                f"crit={result.critical_count} high={result.high_count} "
-                f"t2={result.tier2_count} ({result.latency_s:.1f}s)"
-            )
-            print(status)
+            if result.error:
+                print(f"ERROR: {result.error}")
+            else:
+                print(
+                    f"crit={result.critical_count} high={result.high_count} "
+                    f"t2={result.tier2_count} ({result.latency_s:.1f}s)"
+                )
+                _print_result(result)
 
             if i < total and delay_s > 0:
                 time.sleep(delay_s)

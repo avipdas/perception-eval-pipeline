@@ -56,3 +56,13 @@ export async function fetchPRCurve(runName = "waymo_v1") {
 export function cameraUrl(frameId) {
   return `${BASE}/frames/${frameId}/camera`;
 }
+
+export async function fetchTriageFrame(frameId) {
+  const res = await fetch(`${BASE}/triage/${frameId}`, { cache: "no-store" });
+  return res.json();
+}
+
+export async function fetchTriageSummary() {
+  const res = await fetch(`${BASE}/triage/summary`);
+  return res.json();
+}

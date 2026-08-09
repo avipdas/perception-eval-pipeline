@@ -9,6 +9,7 @@ to the React frontend.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -31,8 +32,9 @@ from dashboard.point_cloud import (
 from storage.database import DatabaseManager
 from storage.schema import EvalResult, Frame, GroundTruth, Prediction, Segment
 
-_DATA_DIR = _PROJECT_ROOT / "data"
-_RAW_WAYMO_DIR = _DATA_DIR / "raw" / "waymo"
+_DATA_DIR       = _PROJECT_ROOT / "data"
+_RAW_WAYMO_DIR  = _DATA_DIR / "raw" / "waymo"
+_TRIAGE_JSONL   = _DATA_DIR / "processed" / "triage_results.jsonl"
 
 app = FastAPI(title="Perception Eval Dashboard")
 
@@ -400,6 +402,126 @@ def get_pr_curve(run_name: str = "waymo_v1"):
             curves[name] = points
 
     return curves
+
+
+# ── Triage helpers ───────────────────────────────────────────────────
+
+def _load_triage_jsonl() -> list[dict]:
+    """Parse triage_results.jsonl (supports both compact and pretty-printed)."""
+    if not _TRIAGE_JSONL.exists():
+        return []
+    raw = _TRIAGE_JSONL.read_text(encoding="utf-8").lstrip()
+    decoder = json.JSONDecoder()
+    records, pos = [], 0
+    while pos < len(raw):
+        try:
+            obj, end = decoder.raw_decode(raw, pos)
+            records.append(obj)
+            pos = end
+            while pos < len(raw) and raw[pos] in " \t\n\r":
+                pos += 1
+        except json.JSONDecodeError:
+            break
+    return records
+
+
+def _enrich_findings(frame_id: int, findings: list[dict], run_name: str = "waymo_v1") -> list[dict]:
+    """
+    Add `highlight_object_id` to each finding so the frontend can
+    highlight the correct box in the 3D scene.
+
+    The serialiser orders events the same way these queries do:
+      FN  → ground_truths ordered by range ASC
+      FP  → predictions ordered by confidence DESC
+      TP  → ground_truths (matched) ordered by gt_range ASC
+    """
+    db = _db()
+    with db.engine.connect() as conn:
+        fn_ids = [
+            r[0] for r in conn.execute(text("""
+                SELECT gt.object_id
+                FROM eval_results er
+                JOIN ground_truths gt ON er.ground_truth_id = gt.id
+                WHERE er.frame_id = :fid AND er.run_name = :run AND er.match_type = 'FN'
+                ORDER BY gt.range ASC
+            """), {"fid": frame_id, "run": run_name}).fetchall()
+        ]
+        fp_ids = [
+            f"pred_{r[0]}" for r in conn.execute(text("""
+                SELECT pr.id
+                FROM eval_results er
+                JOIN predictions pr ON er.prediction_id = pr.id
+                WHERE er.frame_id = :fid AND er.run_name = :run AND er.match_type = 'FP'
+                ORDER BY er.confidence DESC
+            """), {"fid": frame_id, "run": run_name}).fetchall()
+        ]
+        tp_ids = [
+            r[0] for r in conn.execute(text("""
+                SELECT gt.object_id
+                FROM eval_results er
+                JOIN ground_truths gt ON er.ground_truth_id = gt.id
+                WHERE er.frame_id = :fid AND er.run_name = :run AND er.match_type = 'TP'
+                ORDER BY er.gt_range ASC
+            """), {"fid": frame_id, "run": run_name}).fetchall()
+        ]
+
+    id_map = {"FN": fn_ids, "FP": fp_ids, "TP": tp_ids}
+    enriched = []
+    for f in findings:
+        bucket = id_map.get(f.get("event_type", ""), [])
+        idx = f.get("object_index", 1) - 1  # 1-based → 0-based
+        enriched.append({
+            **f,
+            "highlight_object_id": bucket[idx] if 0 <= idx < len(bucket) else None,
+        })
+    return enriched
+
+
+# ── GET /api/triage/summary ──────────────────────────────────────────
+
+@app.get("/api/triage/summary")
+def get_triage_summary():
+    """
+    Return per-frame severity counts for timeline colouring.
+
+    Response: { frame_id: { critical, high, medium, low, tier2 }, ... }
+    """
+    records = _load_triage_jsonl()
+    if not records:
+        return {}
+    summary = {}
+    for r in records:
+        counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "tier2": 0}
+        for f in r.get("findings", []):
+            sev = f.get("safety_severity") or ""
+            if sev in counts:
+                counts[sev] += 1
+            if sev in ("low-medium",):
+                counts["low"] += 1
+            if f.get("tier") == 2:
+                counts["tier2"] += 1
+        summary[str(r["frame_id"])] = {
+            **counts,
+            "frame_summary": r.get("frame_summary", ""),
+        }
+    return summary
+
+
+# ── GET /api/triage/{frame_id} ───────────────────────────────────────
+
+@app.get("/api/triage/{frame_id}")
+def get_triage_frame(frame_id: int, run_name: str = "waymo_v1"):
+    """
+    Return LLM triage findings for a single frame, enriched with
+    highlight_object_id so the frontend can highlight boxes in 3D.
+    """
+    records = _load_triage_jsonl()
+    result = next((r for r in records if r.get("frame_id") == frame_id), None)
+    if result is None:
+        return {"frame_id": frame_id, "findings": [], "frame_summary": "", "error": "no_triage_data"}
+
+    enriched = _enrich_findings(frame_id, result.get("findings", []), run_name)
+    return {**result, "findings": enriched}
 
 
 # ── GET /api/frames/{id}/camera ──────────────────────────────────────
