@@ -279,50 +279,12 @@ python -m scripts.run_analysis --run-name waymo_v1
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Waymo TFRecords                           │
-│              (LiDAR point clouds + 3D annotations)               │
-└──────────────────────┬───────────────────────────────────────────┘
-                       │
-                       ▼
-              ┌────────────────┐
-              │   ingestion/   │  Parse protobufs, extract frames
-              │   loader.py    │  + ground truth boxes
-              │   ingest.py    │
-              └───────┬────────┘
-                      │
-                      ▼
-              ┌────────────────┐
-              │   storage/     │  SQLite via SQLAlchemy
-              │   schema.py    │  segments, frames, ground_truths,
-              │   database.py  │  predictions, eval_results
-              └───────┬────────┘
-                      │
-          ┌───────────┼───────────┐
-          ▼           ▼           ▼
-   ┌────────────┐ ┌──────────┐ ┌──────────────┐
-   │ evaluation/ │ │ analysis/│ │     llm/     │
-   │ matching.py │ │queries.py│ │ serialize.py │
-   │ metrics.py  │ │          │ │ taxonomy.py  │
-   │ iou.py      │ │          │ │ prompts.py   │
-   │ sde.py      │ │          │ │ pipeline.py  │
-   └──────┬─────┘ └──────────┘ └──────┬───────┘
-          │                            │
-          └──────────┬─────────────────┘
-                     ▼
-          ┌─────────────────────┐
-          │     dashboard/      │
-          │  ┌───────────────┐  │
-          │  │  FastAPI API   │  │  12 REST endpoints
-          │  └───────┬───────┘  │
-          │          │          │
-          │  ┌───────┴───────┐  │
-          │  │ React + R3F   │  │  15 components
-          │  │ Three.js 3D   │  │  3D point cloud + boxes
-          │  └───────────────┘  │
-          └─────────────────────┘
-```
+<div align="center">
+  <a href="https://mermaid.live/edit#base64:eyJjb2RlIjogImdyYXBoIFREXG4gICAgc3ViZ3JhcGggSW5wdXRbXCJcdWQ4M2RcdWRjZTEgV2F5bW8gT3BlbiBEYXRhc2V0XCJdXG4gICAgICAgIFRGW1wiVEZSZWNvcmQgRmlsZXM8YnIvPjxpPkxpREFSIHBvaW50IGNsb3VkcyArIDNEIGFubm90YXRpb25zPC9pPlwiXVxuICAgIGVuZFxuXG4gICAgc3ViZ3JhcGggSW5nZXN0aW9uW1wiXHVkODNkXHVkZDA0IEluZ2VzdGlvbiBMYXllclwiXVxuICAgICAgICBMW1wibG9hZGVyLnB5PGJyLz48aT5QYXJzZSBXYXltbyBwcm90b2J1ZnM8L2k-XCJdXG4gICAgICAgIElbXCJpbmdlc3QucHk8YnIvPjxpPkV4dHJhY3QgZnJhbWVzICsgR1QgYm94ZXM8L2k-XCJdXG4gICAgZW5kXG5cbiAgICBzdWJncmFwaCBTdG9yYWdlW1wiXHVkODNkXHVkZGM0XHVmZTBmIFN0b3JhZ2UgTGF5ZXJcIl1cbiAgICAgICAgREJbKFwiU1FMaXRlICsgU1FMQWxjaGVteTxici8-PGk-c2VnbWVudHMgXHUwMGI3IGZyYW1lcyBcdTAwYjcgZ3JvdW5kX3RydXRoczxici8-cHJlZGljdGlvbnMgXHUwMGI3IGV2YWxfcmVzdWx0czwvaT5cIildXG4gICAgZW5kXG5cbiAgICBzdWJncmFwaCBQcm9jZXNzaW5nW1wiXHUyNjk5XHVmZTBmIFByb2Nlc3NpbmdcIl1cbiAgICAgICAgZGlyZWN0aW9uIExSXG4gICAgICAgIHN1YmdyYXBoIEV2YWxbXCJFdmFsdWF0aW9uIEVuZ2luZVwiXVxuICAgICAgICAgICAgTVtcIm1hdGNoaW5nLnB5PGJyLz48aT5HcmVlZHkgSW9VIG1hdGNoaW5nPC9pPlwiXVxuICAgICAgICAgICAgTUVbXCJtZXRyaWNzLnB5PGJyLz48aT5BUCBcdTAwYjcgQVBIIFx1MDBiNyBtQVA8L2k-XCJdXG4gICAgICAgICAgICBJT1VbXCJpb3UucHk8YnIvPjxpPjNEIElvVSB2aWEgU2hhcGVseTwvaT5cIl1cbiAgICAgICAgICAgIFNERVtcInNkZS5weTxici8-PGk-U3VwcG9ydCBEaXN0YW5jZSBFcnJvcjwvaT5cIl1cbiAgICAgICAgZW5kXG4gICAgICAgIHN1YmdyYXBoIEFuYWx5c2lzW1wiU1FMIEFuYWx5c2lzXCJdXG4gICAgICAgICAgICBRW1wicXVlcmllcy5weTxici8-PGk-OSBhbmFseXRpY2FsIGJyZWFrZG93bnM8L2k-XCJdXG4gICAgICAgIGVuZFxuICAgICAgICBzdWJncmFwaCBMTE1bXCJMTE0gVHJpYWdlXCJdXG4gICAgICAgICAgICBTRVJbXCJzZXJpYWxpemUucHk8YnIvPjxpPkV2YWwgXHUyMTkyIG5hdHVyYWwgbGFuZ3VhZ2U8L2k-XCJdXG4gICAgICAgICAgICBUQVhbXCJ0YXhvbm9teS5weTxici8-PGk-MTMgZmFpbHVyZSBjb2RlczwvaT5cIl1cbiAgICAgICAgICAgIFBSW1wicHJvbXB0cy5weTxici8-PGk-Q2hhaW4tb2YtdGhvdWdodDwvaT5cIl1cbiAgICAgICAgICAgIFBJUFtcInBpcGVsaW5lLnB5PGJyLz48aT5DbGF1ZGUgaW50ZWdyYXRpb248L2k-XCJdXG4gICAgICAgIGVuZFxuICAgIGVuZFxuXG4gICAgc3ViZ3JhcGggRGFzaGJvYXJkW1wiXHVkODNkXHVkZGE1XHVmZTBmIEludGVyYWN0aXZlIERhc2hib2FyZFwiXVxuICAgICAgICBBUElbXCJGYXN0QVBJIEJhY2tlbmQ8YnIvPjxpPjEyIFJFU1QgZW5kcG9pbnRzPC9pPlwiXVxuICAgICAgICBVSVtcIlJlYWN0ICsgVGhyZWUuanM8YnIvPjxpPjE1IGNvbXBvbmVudHMgXHUwMGI3IDNEIHZpZXdlcjwvaT5cIl1cbiAgICBlbmRcblxuICAgIFRGIC0tPiBMIC0tPiBJIC0tPiBEQlxuICAgIERCIC0tPiBNICYgUSAmIFNFUlxuICAgIE0gLS0-IE1FXG4gICAgSU9VIC0uLT4gTVxuICAgIFNERSAtLi0-IE1cbiAgICBTRVIgLS0-IFRBWCAtLT4gUFIgLS0-IFBJUFxuICAgIE1FIC0tPiBEQlxuICAgIFBJUCAtLT4gREJcbiAgICBEQiAtLT4gQVBJIC0tPiBVSVxuXG4gICAgY2xhc3NEZWYgaW5wdXQgZmlsbDojMWE3M2U4LHN0cm9rZTojMTU1N2IwLGNvbG9yOiNmZmZcbiAgICBjbGFzc0RlZiBpbmdlc3Rpb24gZmlsbDojMzRhODUzLHN0cm9rZTojMmQ4ZjQ3LGNvbG9yOiNmZmZcbiAgICBjbGFzc0RlZiBzdG9yYWdlIGZpbGw6I2ZiYmMwNCxzdHJva2U6I2Q0YTAwMyxjb2xvcjojMzMzXG4gICAgY2xhc3NEZWYgcHJvY2Vzc2luZyBmaWxsOiNlYTQzMzUsc3Ryb2tlOiNjNTM4MmQsY29sb3I6I2ZmZlxuICAgIGNsYXNzRGVmIGRhc2hib2FyZCBmaWxsOiMxY2U4YjUsc3Ryb2tlOiMxN2M0OWEsY29sb3I6IzMzM1xuXG4gICAgY2xhc3MgVEYgaW5wdXRcbiAgICBjbGFzcyBMLEkgaW5nZXN0aW9uXG4gICAgY2xhc3MgREIgc3RvcmFnZVxuICAgIGNsYXNzIE0sTUUsSU9VLFNERSxRLFNFUixUQVgsUFIsUElQIHByb2Nlc3NpbmdcbiAgICBjbGFzcyBBUEksVUkgZGFzaGJvYXJkIiwgIm1lcm1haWQiOiB7InRoZW1lIjogImRhcmsifX0=">
+    <img src="https://mermaid.ink/img/Z3JhcGggVEQKICAgIHN1YmdyYXBoIElucHV0WyLwn5OhIFdheW1vIE9wZW4gRGF0YXNldCJdCiAgICAgICAgVEZbIlRGUmVjb3JkIEZpbGVzPGJyLz48aT5MaURBUiBwb2ludCBjbG91ZHMgKyAzRCBhbm5vdGF0aW9uczwvaT4iXQogICAgZW5kCgogICAgc3ViZ3JhcGggSW5nZXN0aW9uWyLwn5SEIEluZ2VzdGlvbiBMYXllciJdCiAgICAgICAgTFsibG9hZGVyLnB5PGJyLz48aT5QYXJzZSBXYXltbyBwcm90b2J1ZnM8L2k-Il0KICAgICAgICBJWyJpbmdlc3QucHk8YnIvPjxpPkV4dHJhY3QgZnJhbWVzICsgR1QgYm94ZXM8L2k-Il0KICAgIGVuZAoKICAgIHN1YmdyYXBoIFN0b3JhZ2VbIvCfl4TvuI8gU3RvcmFnZSBMYXllciJdCiAgICAgICAgREJbKCJTUUxpdGUgKyBTUUxBbGNoZW15PGJyLz48aT5zZWdtZW50cyDCtyBmcmFtZXMgwrcgZ3JvdW5kX3RydXRoczxici8-cHJlZGljdGlvbnMgwrcgZXZhbF9yZXN1bHRzPC9pPiIpXQogICAgZW5kCgogICAgc3ViZ3JhcGggUHJvY2Vzc2luZ1si4pqZ77iPIFByb2Nlc3NpbmciXQogICAgICAgIGRpcmVjdGlvbiBMUgogICAgICAgIHN1YmdyYXBoIEV2YWxbIkV2YWx1YXRpb24gRW5naW5lIl0KICAgICAgICAgICAgTVsibWF0Y2hpbmcucHk8YnIvPjxpPkdyZWVkeSBJb1UgbWF0Y2hpbmc8L2k-Il0KICAgICAgICAgICAgTUVbIm1ldHJpY3MucHk8YnIvPjxpPkFQIMK3IEFQSCDCtyBtQVA8L2k-Il0KICAgICAgICAgICAgSU9VWyJpb3UucHk8YnIvPjxpPjNEIElvVSB2aWEgU2hhcGVseTwvaT4iXQogICAgICAgICAgICBTREVbInNkZS5weTxici8-PGk-U3VwcG9ydCBEaXN0YW5jZSBFcnJvcjwvaT4iXQogICAgICAgIGVuZAogICAgICAgIHN1YmdyYXBoIEFuYWx5c2lzWyJTUUwgQW5hbHlzaXMiXQogICAgICAgICAgICBRWyJxdWVyaWVzLnB5PGJyLz48aT45IGFuYWx5dGljYWwgYnJlYWtkb3duczwvaT4iXQogICAgICAgIGVuZAogICAgICAgIHN1YmdyYXBoIExMTVsiTExNIFRyaWFnZSJdCiAgICAgICAgICAgIFNFUlsic2VyaWFsaXplLnB5PGJyLz48aT5FdmFsIOKGkiBuYXR1cmFsIGxhbmd1YWdlPC9pPiJdCiAgICAgICAgICAgIFRBWFsidGF4b25vbXkucHk8YnIvPjxpPjEzIGZhaWx1cmUgY29kZXM8L2k-Il0KICAgICAgICAgICAgUFJbInByb21wdHMucHk8YnIvPjxpPkNoYWluLW9mLXRob3VnaHQ8L2k-Il0KICAgICAgICAgICAgUElQWyJwaXBlbGluZS5weTxici8-PGk-Q2xhdWRlIGludGVncmF0aW9uPC9pPiJdCiAgICAgICAgZW5kCiAgICBlbmQKCiAgICBzdWJncmFwaCBEYXNoYm9hcmRbIvCflqXvuI8gSW50ZXJhY3RpdmUgRGFzaGJvYXJkIl0KICAgICAgICBBUElbIkZhc3RBUEkgQmFja2VuZDxici8-PGk-MTIgUkVTVCBlbmRwb2ludHM8L2k-Il0KICAgICAgICBVSVsiUmVhY3QgKyBUaHJlZS5qczxici8-PGk-MTUgY29tcG9uZW50cyDCtyAzRCB2aWV3ZXI8L2k-Il0KICAgIGVuZAoKICAgIFRGIC0tPiBMIC0tPiBJIC0tPiBEQgogICAgREIgLS0-IE0gJiBRICYgU0VSCiAgICBNIC0tPiBNRQogICAgSU9VIC0uLT4gTQogICAgU0RFIC0uLT4gTQogICAgU0VSIC0tPiBUQVggLS0-IFBSIC0tPiBQSVAKICAgIE1FIC0tPiBEQgogICAgUElQIC0tPiBEQgogICAgREIgLS0-IEFQSSAtLT4gVUkKCiAgICBjbGFzc0RlZiBpbnB1dCBmaWxsOiMxYTczZTgsc3Ryb2tlOiMxNTU3YjAsY29sb3I6I2ZmZgogICAgY2xhc3NEZWYgaW5nZXN0aW9uIGZpbGw6IzM0YTg1MyxzdHJva2U6IzJkOGY0Nyxjb2xvcjojZmZmCiAgICBjbGFzc0RlZiBzdG9yYWdlIGZpbGw6I2ZiYmMwNCxzdHJva2U6I2Q0YTAwMyxjb2xvcjojMzMzCiAgICBjbGFzc0RlZiBwcm9jZXNzaW5nIGZpbGw6I2VhNDMzNSxzdHJva2U6I2M1MzgyZCxjb2xvcjojZmZmCiAgICBjbGFzc0RlZiBkYXNoYm9hcmQgZmlsbDojMWNlOGI1LHN0cm9rZTojMTdjNDlhLGNvbG9yOiMzMzMKCiAgICBjbGFzcyBURiBpbnB1dAogICAgY2xhc3MgTCxJIGluZ2VzdGlvbgogICAgY2xhc3MgREIgc3RvcmFnZQogICAgY2xhc3MgTSxNRSxJT1UsU0RFLFEsU0VSLFRBWCxQUixQSVAgcHJvY2Vzc2luZwogICAgY2xhc3MgQVBJLFVJIGRhc2hib2FyZAo=?bgColor=0d1117" alt="Architecture Diagram" />
+  </a>
+  <p><em>Click the diagram to edit in Mermaid Live</em></p>
+</div>
 
 ---
 
