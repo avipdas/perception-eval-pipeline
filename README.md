@@ -1,5 +1,15 @@
 # Perception Eval Pipeline
 
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/demo.mp4" width="100%" autoplay loop muted playsinline>
+    Your browser does not support the video tag.
+  </video>
+
+  <p><em>Interactive 3D perception evaluation dashboard — LiDAR point clouds, bounding boxes, motion vectors, and failure triage</em></p>
+</div>
+
+> **Note:** If the video doesn't render above, drag-and-drop [`pictures/demo.mp4`](pictures/demo.mp4) into the GitHub issue/PR editor to generate a hosted URL, then replace the `src` above.
+
 **An end-to-end 3D perception evaluation system for autonomous driving, from raw LiDAR to LLM-powered failure triage.**
 
 Built on the [Waymo Open Dataset](https://waymo.com/open/), this pipeline ingests real driving data, evaluates 3D object detection quality with industry-standard metrics (AP, APH, IoU, SDE), classifies failures using Claude, and visualizes everything in an interactive 3D dashboard.
