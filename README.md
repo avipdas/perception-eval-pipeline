@@ -1,12 +1,10 @@
 # Perception Eval Pipeline
 
-<div align="center">
-  <video src="https://github.com/user-attachments/assets/27f11a3b-0cff-4493-84dd-78ff113c1dbd" width="100%" autoplay loop muted playsinline>
-    Your browser does not support the video tag.
-  </video>
+<p align="center">
+  <img src="pictures/perception-demo.webp" width="100%" alt="Perception evaluation dashboard playback">
+</p>
 
-  <p><em>Interactive 3D perception evaluation dashboard — LiDAR point clouds, bounding boxes, motion vectors, and failure triage</em></p>
-</div>
+<p align="center"><em>Interactive 3D perception evaluation dashboard — LiDAR point clouds, bounding boxes, motion vectors, and failure triage</em></p>
 
 **An end-to-end 3D perception evaluation system for autonomous driving, from raw LiDAR to LLM-powered failure triage.**
 

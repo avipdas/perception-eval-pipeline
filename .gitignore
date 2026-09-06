@@ -23,6 +23,12 @@ dashboard/frontend/dist/
 # OS files
 .DS_Store
 
+# Raw video recordings
+*.mov
+
+# Local-only docs
+docs/YOUTUBE_DEMO_SCRIPT.md
+
 # Environment / secrets
 .env
 .env.*
