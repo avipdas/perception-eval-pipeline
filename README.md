@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=kcX1_5MasGU">
-    <img src="pictures/yt-play2.jpg" width="100%" alt="Perception Eval Pipeline — Full Demo">
+    <img src="pictures/yt-play3.jpg" width="100%" alt="Perception Eval Pipeline — Full Demo">
   </a>
 </p>
 
